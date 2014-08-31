@@ -1,0 +1,109 @@
+                        Example of using depack_aplib IDA plugin
+
+                     
+Many protections, and probaly malware are using apLib to compress data
+and make their code smaller. This sometimes can represent a lille problem
+for reversers, as it can turn that protection can be decompressing, after
+it's all decompressed.
+
+For example loader part of compression is decompressed, but later on, it
+will decompress resources, sections, maybe VM engines, etc... dumping all
+of them and loading into database when needed, can be kinda boring task
+for the reverser. This is exactly why we in ARTeam release apLib depack plugin
+which will help you in such scenarios. Lets take a look at one Themida 
+protected application where we want to continue our analyze without actually
+dumping decompressed parts:
+
+WinLicen:00833014                 mov     eax, 0
+WinLicen:00833019                 pusha
+WinLicen:0083301A                 or      eax, eax
+WinLicen:0083301C                 jz      short loc_833086
+...
+WinLicen:00833086                 mov     eax, offset loc_BDEB19
+WinLicen:0083308B                 mov     ecx, offset unk_83326A
+WinLicen:00833090 loc_833090:                          
+WinLicen:00833090                 push    eax
+WinLicen:00833091                 push    ecx
+WinLicen:00833092                 call    sub_83311B    <--- apLib_depack
+WinLicen:00833097                 call    $+5
+WinLicen:0083309C                 pop     eax
+WinLicen:0083309D                 sub     eax, 26h
+WinLicen:008330A2                 mov     ecx, 1EFh
+WinLicen:008330A7                 mov     byte ptr [eax], 0E9h
+WinLicen:008330AA                 sub     ecx, 5
+WinLicen:008330AD                 mov     [eax+1], ecx
+WinLicen:008330B0                 popa
+WinLicen:008330B1                 jmp     loc_833265
+...
+WinLicen:00833265 loc_833265:                            
+WinLicen:00833265                 jmp     loc_BDEB19
+...
+WinLicen:00BDEB19 loc_BDEB19:                            
+WinLicen:00BDEB19                 sub     [eax], al
+
+
+oki here we may see that address BDEB19 is destination for unpacked data, so
+we will run our plugin Edit->Plugins->aplib depack or press Ctrl+9,  and in
+dialog box we will enter:
+
+83326A (where is packed data)
+BDEB19 (where should it be unpacked)
+7      (this is used for unpacking, although only unpacked data is writen dst)
+
+MB field tells to the plugin how much memory it should use for decompression, as
+we can't know how many megabytes decompression will take. In case of too small
+buffer, plugin will notify you to try again, but with much more memory, in this 
+example 6 is needed, as overall extracted data is around 5.5 mega bytes!!!
+
+This can take a while, well time needed for IDA to write to the databse 5.5mb
+of unpacked data which is a lot, while process of unpacking is quite fast:
+
+
+
+WinLicen:00BDEB19 loc_BDEB19:                             
+WinLicen:00BDEB19                 jmp     near ptr unk_BE1FE2
+
+You see now that our code is unpacked, and now we may continue with it's analyze:
+
+WinLicen:00BE1FE2 loc_BE1FE2:
+WinLicen:00BE1FE2                 mov     eax, ebp
+WinLicen:00BE1FE4                 mov     edx, esp
+WinLicen:00BE1FE6                 pusha
+WinLicen:00BE1FE7                 call    $+5
+WinLicen:00BE1FEC                 pop     ebp
+WinLicen:00BE1FED                 sub     ebp, 74734D3h
+WinLicen:00BE1FF3                 mov     [ebp+7472E5Dh], edx
+WinLicen:00BE1FF9                 mov     [ebp+7472D89h], esi
+WinLicen:00BE1FFF                 mov     [ebp+7471599h], eax
+WinLicen:00BE2005                 cmp     dword ptr [ebp+74730D5h], 0
+WinLicen:00BE200C                 jz      short loc_BE201A
+WinLicen:00BE200E                 mov     ebp, eax
+WinLicen:00BE2010                 mov     esp, edx
+WinLicen:00BE2012                 mov     eax, 1
+WinLicen:00BE2017                 retn    0Ch
+WinLicen:00BE201A loc_BE201A:                           
+WinLicen:00BE201A                 mov     eax, [esp+24h]
+WinLicen:00BE201E                 mov     [ebp+7471BF9h], eax
+WinLicen:00BE2024                 push    45h
+WinLicen:00BE2026                 call    sub_BE20CE
+WinLicen:00BE202B                 push    783749Ah
+WinLicen:00BE2030                 call    sub_BE2114
+WinLicen:00BE2035                 push    0A894B25h
+WinLicen:00BE203A                 call    sub_BE2114
+WinLicen:00BE203F                 jmp     loc_BE2258
+
+
+Simple isn't it?
+
+To compile this plugin for your version of IDA, please include ida.lib into plugin
+folder, and change Include path with your IDA SDK, and that's it. Provided binary
+is built with IDA 5.2 SDK...
+
+                                                        deroko of ARTeam
+                                        
+checks notes in source code for why plugin will work even when partial read is
+reported in status window!!!!
+
+
+
+
